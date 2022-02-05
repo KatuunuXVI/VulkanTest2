@@ -15,6 +15,16 @@ typedef struct QueueFamilies_T QueueFamilies;
 /**Provides information about Swap Chain Features that are available*/
 typedef struct SwapChainSupportDetails_T SwapChainSupportDetails;
 
+/******************
+ * Render Structs *
+ ******************/
+
+typedef struct positionVertex positionVertex;
+
+typedef struct colorVertex colorVertex;
+
+typedef struct vertexArrayObject vertexArrayObject;
+
 #ifndef NDEBUG
 
 /************************
@@ -85,6 +95,11 @@ const char* loadFragmentShader();
 /**Loads compiled Shaders*/
 VkShaderModule createShaderModule(const char* filename);
 
+/**Object that allows Physical Device to read Vertex Data*/
+void createVertexBuffer();
+
+unsigned int findMemoryType(unsigned typeFilter, VkMemoryPropertyFlags properties);
+
 /**Renders final output to screen*/
 void draw();
 
@@ -111,12 +126,6 @@ void reCreateSwapChain();
 
 /**Clean old Swap Chain Objects before Recreation*/
 void cleanSwapChain();
-
-/*****************************
- * Synchronization Functions *
- *****************************/
-
-
 
 
 /*********************

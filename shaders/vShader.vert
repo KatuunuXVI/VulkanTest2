@@ -9,5 +9,5 @@ layout(location = 0) out vec4 fragColor;
 
 void main() {
     gl_Position = vec4(inPosition, 1.0);
-    fragColor = inColor;
+    fragColor = vec4(float(inColor.x)/255,inColor.y/255,inColor.z/255,inColor.w/255);
 }

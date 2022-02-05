@@ -114,11 +114,6 @@ static VkBuffer vertexBuffer;
 /**Allocated Memory for Vertex Data*/
 static VkDeviceMemory vertexBufferMemory;
 
-vertexArrayObject vertices[3] = {
-        {{0, -0.5f, 0}, {1, 0, 0, 1}},
-        {{0.5f, 0.5f, 0}, {0, 1, 0, 1}},
-        {{-0.5f, 0.5f, 0}, {0, 0, 1, 1}}
-};
 
 
 /************************
@@ -553,8 +548,8 @@ void createRenderPass() {
 }
 
 void createGraphicsPipeline() {
-    VkShaderModule vShader = createShaderModule("shaders/vert.spv");
-    VkShaderModule fShader = createShaderModule("shaders/frag.spv");
+    VkShaderModule vShader = createShaderModule("vert.spv");
+    VkShaderModule fShader = createShaderModule("frag.spv");
 
     /**Create Pipeline Object*/
     VkPipelineShaderStageCreateInfo vertShaderStageInfo;
@@ -787,7 +782,7 @@ void createVertexBuffer() {
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bufferInfo.pNext = 0;
     bufferInfo.flags = 0;
-    bufferInfo.size = sizeof(vertices);;
+    bufferInfo.size = sizeof(vertexArrayObject) * 3;
     bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
     bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
@@ -812,10 +807,10 @@ void createVertexBuffer() {
 
     vkBindBufferMemory(lDevice, vertexBuffer, vertexBufferMemory, 0);
 
-    void* data;
+    /*void* data;
     vkMapMemory(lDevice, vertexBufferMemory, 0, bufferInfo.size, 0, &data);
     memcpy(data, vertices, bufferInfo.size);
-    vkUnmapMemory(lDevice, vertexBufferMemory);
+    vkUnmapMemory(lDevice, vertexBufferMemory);*/
 
 
 }
@@ -1054,15 +1049,12 @@ void createCommandBuffers() {
         renderPassInfo.clearValueCount = 1;
         renderPassInfo.pClearValues = &clearColor;
         vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-        /*vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, gPipeline);
-        vkCmdDraw(commandBuffers[i],3,1,0,0);*/
-
 
         vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, gPipeline);
         VkBuffer vertexBuffers[] = {vertexBuffer};
         VkDeviceSize offsets[] = {0};
         vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
-        vkCmdDraw(commandBuffers[i], sizeof(vertices), 1, 0,0);
+        vkCmdDraw(commandBuffers[i], sizeof(vertexArrayObject) * 3, 1, 0,0);
         vkCmdEndRenderPass(commandBuffers[i]);
         if(vkEndCommandBuffer(commandBuffers[i])) {
             fprintf(stderr, "Failed to record Command Buffer\n");
@@ -1243,8 +1235,23 @@ void closeDisplay() {
 
 }
 
+
+
 void runDisplay() {
+    /*vertexArrayObject vertices[3] = {
+            {{0, -0.5f, 0}, {128, 0, 0, 255}},
+            {{0.5f, 0.5f, 0}, {0, 255, 0, 255}},
+            {{-0.5f, 0.5f, 0}, {0, 0, 255, 255}}
+    };*/
+
+    vertexArrayObject* vData;
+    vkMapMemory(lDevice, vertexBufferMemory, 0, sizeof(vertexArrayObject) * 3, 0, (void**) &vData);
+    vData[0] = (vertexArrayObject) {{0, -0.5f, 0}, {128, 0, 0, 255}};
+    vData[1] = (vertexArrayObject) {{0.5f, 0.5f, 0}, {0, 255, 0, 255}};
+    vData[2] = (vertexArrayObject) {{-0.5f, 0.5f, 0}, {0, 0, 255, 255}};
     while (!glfwWindowShouldClose(window)) {
+
+        vData[0].color.red = (vData[0].color.red+ 1) % 256;
         glfwPollEvents(); /**Check for input*/
         vkWaitForFences(lDevice, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
 

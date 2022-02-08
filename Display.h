@@ -100,6 +100,12 @@ void createVertexBuffer();
 
 unsigned int findMemoryType(unsigned typeFilter, VkMemoryPropertyFlags properties);
 
+void createIndexBuffer();
+
+void createUniformBuffers();
+
+void updateUniformBuffer(uint currentImage);
+
 /**Renders final output to screen*/
 void draw();
 
@@ -148,6 +154,8 @@ void createSyncObjects();
 
 /**Initialize Vulkan Context*/
 void createVulkanInstance();
+
+void createDescriptorSetLayout();
 
 /**Opens the Window for User Interaction*/
 void initWindow(int width, int height);

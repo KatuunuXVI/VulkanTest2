@@ -6,6 +6,6 @@ set(CMAKE_C_FLAGS "-O3 -Wall -Wextra")
 
 message("${CMAKE_BUILD_TYPE}")
 message("Ur Mom")
-add_executable(VulkanSample main.c Extools.c Extools.h Display.c Display.h)
+add_executable(VulkanSample main.c Extools.c Extools.h Display.c Display.h Textures.c Textures.h lodepng.c)
 target_link_libraries(VulkanSample vulkan glfw3)
 

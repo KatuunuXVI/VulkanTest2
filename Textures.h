@@ -1,0 +1,4 @@
+#ifndef VULKANTEST2_TEXTURES_H
+#define VULKANTEST2_TEXTURES_H
+
+#endif

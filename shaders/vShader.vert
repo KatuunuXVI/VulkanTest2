@@ -8,7 +8,10 @@ layout(binding=0) uniform UniformBufferObject {
 
 layout(location = 0) in vec3 inPosition;
 layout(location = 1) in uvec4 inColor;
+layout(location = 2) in vec2 inTexCoord;
+
 layout(location = 0) out vec4 fragColor;
+layout(location = 1) out vec2 fragTexCoord;
 
 
 
@@ -16,4 +19,5 @@ layout(location = 0) out vec4 fragColor;
 void main() {
     gl_Position =  vec4(inPosition, 1.0);
     fragColor = vec4(float(inColor.x)/255,inColor.y/255,inColor.z/255,inColor.w/255);
+    fragTexCoord = inTexCoord;
 }

@@ -526,6 +526,7 @@ void createLogicalDevice() {
 
     vkGetDeviceQueue(lDevice, families.graphicsFamily, 0, &graphicsQueue);
     vkGetDeviceQueue(lDevice, families.presentFamily, 0, &presentQueue);
+    printf("Created Logical Device\n");
 }
 /********************
  * Render Functions *
@@ -578,6 +579,7 @@ void createRenderPass() {
         fprintf(stderr, "Failed To Create Render Pass\n");
         exit(EXIT_FAILURE);
     }
+    printf("Created Render }ass\n");
 }
 
 void createGraphicsPipeline() {
@@ -608,6 +610,7 @@ void createGraphicsPipeline() {
     vInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
     vInputInfo.pNext = 0;
     vInputInfo.flags = 0;
+
 
     /**Set Vertex Binding Description*/
     vInputInfo.vertexBindingDescriptionCount = 1;
@@ -663,13 +666,14 @@ void createGraphicsPipeline() {
     vpState.pNext = 0;
     vpState.viewportCount = vpState.scissorCount = 1;
     vpState.pViewports = & viewport;
+    vpState.scissorCount = 1;
     vpState.pScissors = &scissor;
 
     /**Initialize Rasterizer*/
     VkPipelineRasterizationStateCreateInfo rasterizer;
     rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-    rasterizer.flags = 0;
     rasterizer.pNext = 0;
+    rasterizer.flags = 0;
     rasterizer.depthClampEnable = VK_FALSE; /**Do not Clamp Fragments*/
     rasterizer.rasterizerDiscardEnable = VK_FALSE; /**Do Not Disable Rasterization*/
     rasterizer.polygonMode = VK_POLYGON_MODE_FILL; /**Fill Polygons with desired Images*/
@@ -730,12 +734,13 @@ void createGraphicsPipeline() {
     /**Consolidate Pipeline*/
     VkGraphicsPipelineCreateInfo pipeline;
     pipeline.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    pipeline.flags = 0;
     pipeline.pNext = 0;
+    pipeline.flags = 0;
     pipeline.stageCount = 2;
     pipeline.pStages = shaderStages;
     pipeline.pVertexInputState = &vInputInfo;
     pipeline.pInputAssemblyState = &inputAssembly;
+    pipeline.pTessellationState = 0;
     pipeline.pViewportState = &vpState;
     pipeline.pRasterizationState = &rasterizer;
     pipeline.pMultisampleState = &mSample;
@@ -748,11 +753,12 @@ void createGraphicsPipeline() {
     pipeline.basePipelineHandle = VK_NULL_HANDLE;
     pipeline.basePipelineIndex = -1;
 
+    printf("Creating Graphics Pipeleine\n");
     if(vkCreateGraphicsPipelines(lDevice, 0, 1, &pipeline, 0, &gPipeline) != VK_SUCCESS) {
         fprintf(stderr, "Failed to Create Graphics Pipeline\n");
         exit(1);
     }
-
+    printf("Destroying Modules\n");
     vkDestroyShaderModule(lDevice, vShader, 0);
     vkDestroyShaderModule(lDevice, fShader, 0);
 }
@@ -865,11 +871,14 @@ void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyF
     bufferInfo.size = size;
     bufferInfo.usage = usage;
     bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-    if (vkCreateBuffer(lDevice, &bufferInfo, 0, buffer) != VK_SUCCESS) {
+    bufferInfo.queueFamilyIndexCount = 0;
+    bufferInfo.pQueueFamilyIndices = 0;
+    VkResult res;
+    if ((res = vkCreateBuffer(lDevice, &bufferInfo, 0, buffer)) != VK_SUCCESS) {
         fprintf(stderr, "failed to create buffer!");
         exit(1);
     }
+    printf("BUffer Res: %d\n", res);
 
     VkMemoryRequirements memRequirements;
 
@@ -888,6 +897,8 @@ void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyF
     }
 
     vkBindBufferMemory(lDevice, *buffer, *bufferMemory, 0);
+
+
 }
 
 void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
@@ -918,7 +929,7 @@ void createVertexBuffer() {
 
     vkMapMemory(lDevice, stagingBufferMemory, 0, bufferSize, 0, (void**) &vData);
     memcpy(vData, vertices, bufferSize);
-    //vkUnmapMemory(lDevice, stagingBufferMemory);
+    vkUnmapMemory(lDevice, stagingBufferMemory);
 
     createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &vertexBuffer, &vertexBufferMemory);
 
@@ -1166,7 +1177,7 @@ void createTextureImage() {
 
 
     free(img);
-
+    printf("Image Freed\n");
     createImage(width, height, VK_FORMAT_R8G8B8A8_SRGB,  VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &textureBuffer, &textureBufferMemory);
 
     transitionImageLayout(textureBuffer, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
@@ -1174,7 +1185,7 @@ void createTextureImage() {
     transitionImageLayout(textureBuffer, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
     vkDestroyBuffer(lDevice, tStagingBuffer, 0);
-    vkFreeMemory(lDevice, textureBufferMemory, 0);
+    vkFreeMemory(lDevice, tStagingBufferMemory, 0);
 }
 
 
@@ -1615,8 +1626,11 @@ void closeDisplay() {
     DestroyDebugUtilsMessengerEXT(vInstance, debugMessenger, 0);
 #endif
     for(unsigned int i = 0; i < swapChainSize; i++) vkDestroyFramebuffer(lDevice, swapChainFrameBuffers[i], 0);
+
     vkDestroyPipeline(lDevice, gPipeline, 0);
+
     vkDestroyPipelineLayout(lDevice, pipelineLayout, 0);
+
     vkDestroyRenderPass(lDevice, renderPass, 0);
     vkDestroyCommandPool(lDevice, commandPool, 0);
     for(int i = 0; i < MAX_FRAMES_IN_FLIGHT; i ++) {
@@ -1625,19 +1639,30 @@ void closeDisplay() {
         vkDestroyFence(lDevice, inFlightFences[i], 0);
     }
     vkDestroySwapchainKHR(lDevice, swapChain, 0);
+    printf("Destroyed Swap Chain\n");
     vkDestroyDescriptorSetLayout(lDevice, descriptorSetLayout, 0);
+    printf("Destroyed Descriptor Set\n");
 #ifndef NOSTAGE
+    printf("Staging Buffer Address: %p\n", &stagingBuffer);
     vkDestroyBuffer(lDevice, stagingBuffer, 0);
+
     vkFreeMemory(lDevice, stagingBufferMemory,0);
 #endif
+
+
     vkDestroyImage(lDevice, textureBuffer, 0);
     vkFreeMemory(lDevice, textureBufferMemory,0);
+
+
     vkDestroyBuffer(lDevice, vertexBuffer, 0);
     vkFreeMemory(lDevice, vertexBufferMemory,0);
+
     vkDestroyBuffer(lDevice, indexBuffer, 0);
     vkFreeMemory(lDevice, indexBufferMemory,0);
+    printf("Buffers Destroyed\n");
     for(uint i = 0; i < swapChainSize; i++) vkDestroyImageView(lDevice, swapChainImageViews[i], 0);
     vkDestroyDevice(lDevice,0);
+    printf("Device Destroyed\n");
     vkDestroySurfaceKHR(vInstance, surface, 0);
     vkDestroyInstance(vInstance, 0);
     glfwDestroyWindow(window);
@@ -1752,6 +1777,7 @@ void runDisplay() {
     }
     vkDeviceWaitIdle(lDevice);
     printf("Average Op Time: %f\n", avgOpTime/opCount);
+
 }
 
 void openDisplay() {
@@ -1764,15 +1790,21 @@ void openDisplay() {
     pickDevice();
     createLogicalDevice();
     createSwapChain();
+    printf("Created Swap Chain\n");
     createImageViews();
+    printf("Created Image Views\n");
     createRenderPass();
+
     createGraphicsPipeline();
+    printf("Created Pipeline\n");
     createFrameBuffers();
     createCommandPool();
     createTextureImage();
     createVertexBuffer();
+
     createIndexBuffer();
     createCommandBuffers();
 
     createSyncObjects();
+
 }

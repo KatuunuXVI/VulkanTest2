@@ -160,7 +160,7 @@ void createDescriptorSetLayout();
 /**Opens the Window for User Interaction*/
 void initWindow(int width, int height);
 
-static void resizeCallback(GLFWwindow* window, int width, int height);
+static void resizeCallback();
 
 /*********************
  * General Functions *

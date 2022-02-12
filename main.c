@@ -11,6 +11,8 @@ typedef struct fShader {
 
 
 int main() {
+
+
     /**Recompile Shaders*/
     system("compileShaders.bat");
     openDisplay();

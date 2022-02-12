@@ -5,6 +5,9 @@
 #include "Display.h"
 #include <sys/time.h>
 #include <lodepng.h>
+#define _USE_MATH_DEFINES
+#include <math.h>
+
 /**********************
  * Struct Definitions *
  **********************/
@@ -34,9 +37,9 @@ typedef struct SwapChainSupportDetails_T {
  ******************/
 
 typedef struct positionVertex {
-    float x;
-    float y;
-    float z;
+    unsigned short x;
+    unsigned short y;
+    unsigned short z;
 } positionVertex;
 
 typedef struct colorVertex {
@@ -60,9 +63,7 @@ typedef struct vertexArrayObject {
 } vertexArrayObject;
 
 typedef struct uniformBufferObject {
-    int model[4][4];
-    int view[4][4];
-    int proj[4][4];
+    float model[4][4];
 } uniformBufferObject;
 
 #ifndef NDEBUG
@@ -149,10 +150,10 @@ static VkImageView textureImageView;
 
 static VkSampler textureSampler;
 vertexArrayObject vertices[4] = {
-        {{-0.5f, -0.5f, 0}, {1, 0, 1, 1}, {0, 0}},
-        {{0.5f, -0.5f, 0}, {1, 1, 0, 1}, {1, 0}},
-        {{0.5f, 0.5f, 0}, {0, 1, 1, 1}, {1,1}},
-        {{-0.5f, 0.5f, 0}, {1, 1, 1, 1}, {0,1}}
+        {{-1024, -1024, 0}, {1, 0, 1, 1}, {0, 0}},
+        {{1024, -1024, 0}, {1, 1, 0, 1}, {1, 0}},
+        {{1024, 1024, 0}, {0, 1, 1, 1}, {1,1}},
+        {{-1024, 1024, 0}, {1, 1, 1, 1}, {0,1}}
 };
 unsigned short indices[6] = { 0, 1, 2, 2, 3, 0};
 
@@ -987,9 +988,55 @@ void createUniformBuffers() {
 
 }
 
+typedef struct mat4 {
+    float m[4][4];
+} mat4;
+
+mat4 identityMat4(float identity) {
+    mat4 mat;
+    memset(&mat,0,sizeof(mat4));
+    mat.m[0][0] =
+            mat.m[1][1] =
+                    mat.m[2][2] =
+                            mat.m[3][3] = 1;
+    return mat;
+}
+int mapped = 0;
+float pos = 0;
+float angle = 0;
+uniformBufferObject* data;
 void updateUniformBuffer(uint currentImage) {
+
     uniformBufferObject ubo;
-    //ubo.model =
+    /*if(!(mapped & currentImage)) {
+        vkMapMemory(lDevice, uniformBuffersMemory[currentImage],0,sizeof(ubo), 0, (void*)&ubo.model[0]);
+        mapped &= currentImage;
+    }*/
+
+    vkMapMemory(lDevice, uniformBuffersMemory[currentImage],0,sizeof(ubo), 0, (void*) &data);
+
+    //memcpy(data, &ubo, sizeof(ubo));
+
+    memset(data->model, 0, sizeof(data->model));
+
+    //if(pos > 2.0f) pos  = -2.0f; else pos = (pos + 0.02f);
+    data->model[2][2] = data->model[3][3] = 1;
+    /*data->model[0][0] =
+    data->model[1][1] =
+    data->model[2][2] =
+    data->model[3][3] = 1;*/
+    data->model[0][0] = cosf(angle);
+    data->model[0][1] = -sinf(angle);
+    data->model[1][1] = cosf(angle);
+    data->model[1][0] = sinf(angle);
+
+    data->model[3][0] = pos;
+    //data->model[3][1] = pos;
+
+    //printf("[ %f, %f], [%f, %f]\n", acosf(data->model[0][0]) * 180 / M_PI, data->model[0][1] * 180 / M_PI, data->model[1][1] * 180 / M_PI,data->model[1][0] * 180 / M_PI);
+
+    vkUnmapMemory(lDevice, uniformBuffersMemory[currentImage]);
+    //if(angle >= 2 * M_PI) angle = 0; else angle += M_PI / 800;
 }
 
 #endif
@@ -1416,7 +1463,7 @@ void reCreateSwapChain() {
     createRenderPass();
     createGraphicsPipeline();
     createFrameBuffers();
-    //createUniformBuffers();
+    createUniformBuffers();
     createDescriptorPool();
     createDescriptorSets();
     createCommandBuffers();
@@ -1436,9 +1483,9 @@ void cleanSwapChain() {
     vkDestroyPipelineLayout(lDevice, pipelineLayout, 0);
     printf("Pipeline Layout Destroyed\n");
     vkDestroyRenderPass(lDevice, renderPass, 0);
-    printf("Render Pass Destroyed\n");
+
     for(uint i = 0; i < swapChainSize; i++) vkDestroyImageView(lDevice, swapChainImageViews[i], 0);
-    printf("Image Views Destroyed\n");
+
     /*for(uint i = 0; i < swapChainSize; i++) {
         vkDestroyBuffer(lDevice, uniformBuffers[i], 0);
         vkFreeMemory(lDevice, uniformBuffersMemory[i], 0);
@@ -1446,7 +1493,10 @@ void cleanSwapChain() {
     printf("Buffers Dest");
     printf("Destroying Chain\n");
     vkDestroySwapchainKHR(lDevice, swapChain, 0);
-    printf("Chain Destroyed\n");
+    for(uint i = 0; i < swapChainSize; i++) {
+        vkDestroyBuffer(lDevice, uniformBuffers[i],0);
+        vkFreeMemory(lDevice,uniformBuffersMemory[i], 0);
+    }
     vkDestroyDescriptorPool(lDevice, descriptorPool, 0);
     //for(uint i = 0; i < swapChainSize; i++)
 }
@@ -1655,14 +1705,14 @@ void createVulkanInstance() {
 }
 
 void createDescriptorSetLayout() {
-    /*VkDescriptorSetLayoutBinding  uboLayoutBinding;
+    VkDescriptorSetLayoutBinding  uboLayoutBinding;
     uboLayoutBinding.binding = 0;
-    uboLayoutBinding.descriptorCount = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    uboLayoutBinding.descriptorCount = 1;*/
+    uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    uboLayoutBinding.descriptorCount = 1;
 
     /**Reference Descriptor from Vertex Shader*/
-    //uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-    //uboLayoutBinding.pImmutableSamplers = 0;
+    uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    uboLayoutBinding.pImmutableSamplers = 0;
 
 
     VkDescriptorSetLayoutBinding  samplerLayoutBinding;
@@ -1672,12 +1722,13 @@ void createDescriptorSetLayout() {
     samplerLayoutBinding.pImmutableSamplers = 0;
     samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
+    VkDescriptorSetLayoutBinding bindings[2] = {uboLayoutBinding, samplerLayoutBinding};
     VkDescriptorSetLayoutCreateInfo  layoutInfo;
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     layoutInfo.pNext = 0;
     layoutInfo.flags = 0;
-    layoutInfo.bindingCount = 1;
-    layoutInfo.pBindings = &samplerLayoutBinding;
+    layoutInfo.bindingCount = 2;
+    layoutInfo.pBindings = bindings;
 
 
     if(vkCreateDescriptorSetLayout(lDevice, &layoutInfo, 0, &descriptorSetLayout) != VK_SUCCESS) {
@@ -1689,16 +1740,18 @@ void createDescriptorSetLayout() {
 }
 
 void createDescriptorPool() {
-    VkDescriptorPoolSize poolSize;
-    poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    poolSize.descriptorCount = swapChainSize;
+    VkDescriptorPoolSize poolSizes[2];
+    poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    poolSizes[0].descriptorCount = swapChainSize;
+    poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    poolSizes[1].descriptorCount = swapChainSize;
 
     VkDescriptorPoolCreateInfo poolInfo;
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     poolInfo.pNext = 0;
     poolInfo.flags = 0;
-    poolInfo.poolSizeCount = 1;
-    poolInfo.pPoolSizes = &poolSize;
+    poolInfo.poolSizeCount = 2;
+    poolInfo.pPoolSizes = poolSizes;
     poolInfo.maxSets = swapChainSize;
 
     if(vkCreateDescriptorPool(lDevice, &poolInfo, 0, & descriptorPool)) {
@@ -1725,25 +1778,40 @@ void createDescriptorSets() {
     }
 
     for(uint i = 0; i < swapChainSize; i++) {
+
+        VkDescriptorBufferInfo  bufferInfo;
+        bufferInfo.buffer = uniformBuffers[i];
+        bufferInfo.offset = 0;
+        bufferInfo.range = sizeof(uniformBufferObject);
+
         VkDescriptorImageInfo imageInfo;
         imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         imageInfo.imageView = textureImageView;
         imageInfo.sampler= textureSampler;
 
-        VkWriteDescriptorSet descriptorWrite;
-        descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrite.pNext = 0;
-        descriptorWrite.dstSet = descriptorSets[i];
-        descriptorWrite.dstBinding = 1;
-        descriptorWrite.dstArrayElement = 0;
-        descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        descriptorWrite.descriptorCount =1;
-        descriptorWrite.pImageInfo = &imageInfo;
-        descriptorWrite.pBufferInfo = 0;
-        descriptorWrite.pTexelBufferView = 0;
+        VkWriteDescriptorSet descriptorWrites[2];
+
+        descriptorWrites[0].sType = descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[0].pNext = descriptorWrites[1].pNext = 0;
+        descriptorWrites[0].dstSet = descriptorWrites[1].dstSet = descriptorSets[i];
+        descriptorWrites[0].dstBinding = 0;
+        descriptorWrites[1].dstBinding = 1;
+
+        descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        descriptorWrites[0].descriptorCount = descriptorWrites[1].descriptorCount =1;
+        descriptorWrites[0].pBufferInfo = &bufferInfo;
 
 
-        vkUpdateDescriptorSets(lDevice, 1, &descriptorWrite,0,0);
+
+        descriptorWrites[0].pImageInfo = 0;
+        descriptorWrites[1].pImageInfo = &imageInfo;
+        descriptorWrites[1].pBufferInfo = 0;
+        descriptorWrites[0].pTexelBufferView = descriptorWrites[1].pTexelBufferView = 0;
+
+        descriptorWrites[0].dstArrayElement = descriptorWrites[1].dstArrayElement = 0;
+
+        vkUpdateDescriptorSets(lDevice, 2, descriptorWrites,0,0);
 
     }
 
@@ -1761,7 +1829,7 @@ void initWindow(int width, int height) {
 
 }
 
-static void resizeCallback(GLFWwindow* window, int width, int height) {
+static void resizeCallback() {
     resized = TRUE;
 }
 /*********************
@@ -1787,6 +1855,10 @@ void closeDisplay() {
         vkDestroyFence(lDevice, inFlightFences[i], 0);
     }
     vkDestroySwapchainKHR(lDevice, swapChain, 0);
+    for(uint i = 0; i < swapChainSize; i++) {
+        vkDestroyBuffer(lDevice, uniformBuffers[i],0);
+        vkFreeMemory(lDevice,uniformBuffersMemory[i], 0);
+    }
     vkDestroyDescriptorSetLayout(lDevice, descriptorSetLayout, 0);
     vkDestroyDescriptorPool(lDevice, descriptorPool, 0);
 
@@ -1827,7 +1899,7 @@ void runDisplay() {
     while (!glfwWindowShouldClose(window) && opCount < 300) {
         struct timeval start, end;
         gettimeofday(&start, NULL);
-        float tranX = 0.001f;
+        //float tranX = 0.001f;
         /*vData[0].position.x += tranX;
         vData[0].color.red += 1%255;
         vData[1].position.x += tranX;
@@ -1867,6 +1939,9 @@ void runDisplay() {
 
         if(imagesInFlight[imageIndex]) vkWaitForFences(lDevice, 1, &imagesInFlight[imageIndex], VK_TRUE, UINT64_MAX);
         imagesInFlight[imageIndex] = inFlightFences[currentFrame];
+
+
+        updateUniformBuffer(imageIndex);
         VkSubmitInfo submitInfo;
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
         submitInfo.pNext = 0;
@@ -1948,6 +2023,7 @@ void openDisplay() {
     createTextureSampler();
     createVertexBuffer();
     createIndexBuffer();
+    createUniformBuffers();
     createDescriptorPool();
     createDescriptorSets();
     createCommandBuffers();

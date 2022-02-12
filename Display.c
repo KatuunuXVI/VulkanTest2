@@ -150,10 +150,10 @@ static VkImageView textureImageView;
 
 static VkSampler textureSampler;
 vertexArrayObject vertices[4] = {
-        {{-1024, -1024, 0}, {1, 0, 1, 1}, {0, 0}},
-        {{1024, -1024, 0}, {1, 1, 0, 1}, {1, 0}},
-        {{1024, 1024, 0}, {0, 1, 1, 1}, {1,1}},
-        {{-1024, 1024, 0}, {1, 1, 1, 1}, {0,1}}
+        {{0, 0, 0}, {0, 192, 64, 255}, {0, 0}},
+        {{1024, 0, 0}, {64, 0, 128, 255}, {1, 0}},
+        {{1024, 1024, 0}, {128, 64, 192, 255}, {1,1}},
+        {{0, 1024, 0}, {192, 128, 0, 255}, {0,1}}
 };
 unsigned short indices[6] = { 0, 1, 2, 2, 3, 0};
 
@@ -642,7 +642,7 @@ void createGraphicsPipeline() {
     /**Define Position Data*/
     attDesc[0].binding = 0;
     attDesc[0].location = 0;
-    attDesc[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+    attDesc[0].format = VK_FORMAT_R16G16B16_UINT;
     attDesc[0].offset = 0;
 
     /**Define Color Data*/
@@ -1220,10 +1220,31 @@ void copyBufferToImage(VkBuffer buffer, VkImage image, uint width, uint height) 
     endSingleTimeCommands(commandBuffer);
 }
 
+void combineImgs(unsigned char** finalImg, unsigned char* img1, unsigned char* img2, unsigned int width, unsigned int height) {
+    *finalImg = malloc(2 * width * height * 4);
+    //memcpy(*finalImg,img1, width * height * 4);
+    //memcpy(*finalImg + (width * height * 4),img2, width * height * 4);
+    for(uint i = 0; i < height; i++) {
+        printf("Row %d\n",i);
+        unsigned char* dest1 = (*finalImg) + 2 * width * 4 * i;
+        unsigned char* dest2 = (*finalImg) + (2 * width * 4 * i) + width;
+        printf("Dest 1: %d\n", dest1);
+        printf("Dest 2: %d\n", dest2);
+        memcpy((*finalImg) + 2 * width * 4 * i, img1 + width * 4 * i, width * 4 );
+        memcpy((*finalImg) + (2 * width * 4 * i) + width *4, img2 + width * 4 * i, width * 4 );
+
+    }
+}
+
 void createTextureImage() {
     unsigned char* img = 0;
-    unsigned int width, height;
+    unsigned char* img2 = 0;
+    unsigned int width, height, width2, height2;
     unsigned error = lodepng_decode32_file(&img, &width, &height, "Tic.png");
+    unsigned error2 = lodepng_decode32_file(&img2, &width2, &height2, "Rochelle.png");
+    unsigned char* img3 = 0;
+    combineImgs(&img3,  img, img2, width, height);
+    width *= 2;
     VkDeviceSize imageSize = width * height * 4;
 
     if (error) {
@@ -1237,11 +1258,13 @@ void createTextureImage() {
 
     void* data;
     vkMapMemory(lDevice, tStagingBufferMemory, 0, imageSize, 0, &data);
-    memcpy(data, img, imageSize);
+    memcpy(data, img3, imageSize);
     vkUnmapMemory(lDevice, tStagingBufferMemory);
 
 
     free(img);
+    free(img2);
+    free(img3);
     printf("Image Freed\n");
     createImage(width, height, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &textureImage, &textureImageMemory);
 
@@ -2003,7 +2026,7 @@ void runDisplay() {
 }
 
 void openDisplay() {
-    initWindow(1024,1024); /**Open Window*/
+    initWindow(2048,1024); /**Open Window*/
     createVulkanInstance(); /**Start Vulkan*/
     if(glfwCreateWindowSurface(vInstance, window, 0, &surface)) { /**Link Vulkan to Window*/
         fprintf(stderr, "Failed to generate Window Surface");

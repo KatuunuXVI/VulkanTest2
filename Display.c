@@ -742,7 +742,8 @@ void createGraphicsPipeline() {
     plInfo.pNext = 0;
     plInfo.setLayoutCount = 1;
     plInfo.pSetLayouts = &descriptorSetLayout;
-    //plInfo.pushConstantRangeCount = 0;
+    plInfo.pushConstantRangeCount = 0;
+    plInfo.pPushConstantRanges = 0;
     VkResult res;
     if((res = vkCreatePipelineLayout(lDevice, &plInfo,0,&pipelineLayout)) != VK_SUCCESS) {
         fprintf(stderr, "Failed to Create Pipeline: %d\n", res);
@@ -1175,7 +1176,7 @@ void copyBufferToImage(VkBuffer buffer, VkImage image, uint width, uint height) 
 void createTextureImage() {
     unsigned char* img = 0;
     unsigned int width, height;
-    unsigned error = lodepng_decode32_file(&img, &width, &height, "Rochelle.png");
+    unsigned error = lodepng_decode32_file(&img, &width, &height, "Tic.png");
     VkDeviceSize imageSize = width * height * 4;
 
     if (error) {
@@ -1393,6 +1394,9 @@ void createImageViews() {
 
 }
 
+void createDescriptorPool();
+void createDescriptorSets();
+
 void reCreateSwapChain() {
     int width, height;
     glfwGetFramebufferSize(window, &width, &height);
@@ -1402,6 +1406,7 @@ void reCreateSwapChain() {
     }
     /**Wait for Resources to free up*/
     vkDeviceWaitIdle(lDevice);
+    printf("Devices Freed\n");
 
     /**Clean Objects*/
     cleanSwapChain();
@@ -1409,30 +1414,41 @@ void reCreateSwapChain() {
     createSwapChain();
     createImageViews();
     createRenderPass();
-
     createGraphicsPipeline();
     createFrameBuffers();
-    createFrameBuffers();
+    //createUniformBuffers();
+    createDescriptorPool();
+    createDescriptorSets();
     createCommandBuffers();
 
+    //imagesInFlight =
 }
 
 void cleanSwapChain() {
+    printf ("__FUNCTION__ = %s\n", __FUNCTION__);
     /**Remove Frame Buffers*/
     for(uint i = 0; i < swapChainSize; i++) vkDestroyFramebuffer(lDevice, swapChainFrameBuffers[i], 0);
-
+    printf("CSW: Frame Destroyed\n");
     vkFreeCommandBuffers(lDevice, commandPool, swapChainSize, commandBuffers);
-
+    printf("COmmand Buffers Freed\n");
     vkDestroyPipeline(lDevice, gPipeline, 0);
+    printf("Pipeline Destroyed\n");
     vkDestroyPipelineLayout(lDevice, pipelineLayout, 0);
+    printf("Pipeline Layout Destroyed\n");
     vkDestroyRenderPass(lDevice, renderPass, 0);
-
-    for(int i = 0; i < swapChainSize; i++) vkDestroyImageView(lDevice, swapChainImageViews[i], 0);
-    for(uint i = 0; i < swapChainSize; i++) {
+    printf("Render Pass Destroyed\n");
+    for(uint i = 0; i < swapChainSize; i++) vkDestroyImageView(lDevice, swapChainImageViews[i], 0);
+    printf("Image Views Destroyed\n");
+    /*for(uint i = 0; i < swapChainSize; i++) {
         vkDestroyBuffer(lDevice, uniformBuffers[i], 0);
         vkFreeMemory(lDevice, uniformBuffersMemory[i], 0);
-    }
+    }*/
+    printf("Buffers Dest");
+    printf("Destroying Chain\n");
     vkDestroySwapchainKHR(lDevice, swapChain, 0);
+    printf("Chain Destroyed\n");
+    vkDestroyDescriptorPool(lDevice, descriptorPool, 0);
+    //for(uint i = 0; i < swapChainSize; i++)
 }
 /*********************
  * Command Functions *
@@ -1812,14 +1828,14 @@ void runDisplay() {
         struct timeval start, end;
         gettimeofday(&start, NULL);
         float tranX = 0.001f;
-        vData[0].position.x += tranX;
+        /*vData[0].position.x += tranX;
         vData[0].color.red += 1%255;
         vData[1].position.x += tranX;
         vData[1].color.green += 1%255;
         vData[2].position.x += tranX;
         vData[2].color.blue += 1%255;
         vData[3].position.x += tranX;
-        vData[3].color.red += 1%255;
+        vData[3].color.red += 1%255;*/
         VkDeviceSize bufferSize = sizeof(vertices);
 #ifndef NOSTAGE
         copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
@@ -1890,6 +1906,8 @@ void runDisplay() {
 
         if(presRes == VK_ERROR_OUT_OF_DATE_KHR || presRes == VK_SUBOPTIMAL_KHR || resized) {
             reCreateSwapChain();
+            resized = FALSE;
+            printf("Resized: %d\n", resized);
         } else if(presRes != VK_SUCCESS) {
             fprintf(stderr,"Failed to Present Swap Chain Image]n");
             return;
@@ -1901,7 +1919,7 @@ void runDisplay() {
         gettimeofday(&end, NULL);
         //printf("took %f milliseconds\n", ((end.tv_sec - start.tv_sec) * 1000000 + end.tv_usec - start.tv_usec)/1000.0);
         avgOpTime += ((end.tv_sec - start.tv_sec) * 1000000 + end.tv_usec - start.tv_usec)/1000.0;
-        opCount++;
+        //opCount++;
         usleep(300);
     }
     vkDeviceWaitIdle(lDevice);

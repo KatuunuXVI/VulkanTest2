@@ -15,11 +15,10 @@
 /******************
  * Device Structs *
  ******************/
-//#define NOSTAGE
+#define NOSTAGE
 //#undef NOSTAGE
 typedef struct QueueFamilies_T {
     unsigned char familiesFound;
-    unsigned int familyCount;
     unsigned int graphicsFamily;
     unsigned int presentFamily;
 } QueueFamilies;
@@ -37,29 +36,29 @@ typedef struct SwapChainSupportDetails_T {
  ******************/
 
 typedef struct positionVertex {
-    unsigned short x;
-    unsigned short y;
-    unsigned short z;
+    __attribute__((unused)) unsigned short x;
+    __attribute__((unused)) unsigned short y;
+    __attribute__((unused)) unsigned short z;
 } positionVertex;
 
 typedef struct colorVertex {
-    unsigned char red;
-    unsigned char green;
-    unsigned char blue;
-    unsigned char alpha;
+    __attribute__((unused)) unsigned char red;
+    __attribute__((unused)) unsigned char green;
+    __attribute__((unused)) unsigned char blue;
+    __attribute__((unused)) unsigned char alpha;
 } colorVertex;
 
 typedef struct textureVertex {
     //unsigned short x;
     //unsigned short y;
-    float x;
-    float y;
+    __attribute__((unused)) float x;
+    __attribute__((unused)) float y;
 } textureVertex;
 
 typedef struct vertexArrayObject {
-    positionVertex position; /**Specify Vertex Position on Screen*/
-    colorVertex color; /**Specify Vertex Color on Screen*/
-    textureVertex texture; /**Specify Vertex Texture on Screen*/
+    __attribute__((unused)) positionVertex position; /**Specify Vertex Position on Screen*/
+    __attribute__((unused)) colorVertex color; /**Specify Vertex Color on Screen*/
+    __attribute__((unused))textureVertex texture; /**Specify Vertex Texture on Screen*/
 } vertexArrayObject;
 
 typedef struct uniformBufferObject {
@@ -83,7 +82,9 @@ VkDebugUtilsMessengerEXT debugMessenger; /**Debugging Object*/
 /********************
  * Device Variables *
  ********************/
+int maxTextureWidth;
 
+int maxTextureHeight;
 
 const int extensionCount = 1; /**Number of Device Extensions*/
 
@@ -375,8 +376,7 @@ QueueFamilies findQueueFamilies(VkPhysicalDevice dev) {
         fprintf(stderr, "No Queue Families Available\n");
         exit(EXIT_FAILURE);
     }
-    foundFamilies.familyCount = familyCount;
-
+    
     /**Get Family Properties*/
     VkQueueFamilyProperties families[familyCount];
     vkGetPhysicalDeviceQueueFamilyProperties(dev,&familyCount, families);
@@ -936,8 +936,6 @@ void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
 
 
 #ifndef NOSTAGE
-
-
 void createVertexBuffer() {
 
     VkDeviceSize bufferSize = sizeof(vertices);
@@ -975,7 +973,7 @@ void createIndexBuffer() {
     vkDestroyBuffer(lDevice, iStagingBuffer, 0);
     vkFreeMemory(lDevice, iStagingBufferMemory, 0);
 }
-
+#endif
 void createUniformBuffers() {
     VkDeviceSize bufferSize = sizeof(uniformBufferObject);
 
@@ -988,20 +986,6 @@ void createUniformBuffers() {
 
 }
 
-typedef struct mat4 {
-    float m[4][4];
-} mat4;
-
-mat4 identityMat4(float identity) {
-    mat4 mat;
-    memset(&mat,0,sizeof(mat4));
-    mat.m[0][0] =
-            mat.m[1][1] =
-                    mat.m[2][2] =
-                            mat.m[3][3] = 1;
-    return mat;
-}
-int mapped = 0;
 float pos = 0;
 float angle = 0;
 uniformBufferObject* data;
@@ -1039,7 +1023,7 @@ void updateUniformBuffer(uint currentImage) {
     //if(angle >= 2 * M_PI) angle = 0; else angle += M_PI / 800;
 }
 
-#endif
+
 
 
 #ifdef NOSTAGE
@@ -1220,31 +1204,47 @@ void copyBufferToImage(VkBuffer buffer, VkImage image, uint width, uint height) 
     endSingleTimeCommands(commandBuffer);
 }
 
-void combineImgs(unsigned char** finalImg, unsigned char* img1, unsigned char* img2, unsigned int width, unsigned int height) {
+void combineImgsWid(unsigned char** finalImg, unsigned char* img1, unsigned char* img2, unsigned int width, unsigned int height) {
+
+
     *finalImg = malloc(2 * width * height * 4);
-    //memcpy(*finalImg,img1, width * height * 4);
-    //memcpy(*finalImg + (width * height * 4),img2, width * height * 4);
+    //*finalImg = malloc(2 * width * height * 4);
     for(uint i = 0; i < height; i++) {
-        printf("Row %d\n",i);
-        unsigned char* dest1 = (*finalImg) + 2 * width * 4 * i;
-        unsigned char* dest2 = (*finalImg) + (2 * width * 4 * i) + width;
-        printf("Dest 1: %d\n", dest1);
-        printf("Dest 2: %d\n", dest2);
         memcpy((*finalImg) + 2 * width * 4 * i, img1 + width * 4 * i, width * 4 );
         memcpy((*finalImg) + (2 * width * 4 * i) + width *4, img2 + width * 4 * i, width * 4 );
-
     }
+
+}
+
+void combineImgsHeight(unsigned char** finalImg, unsigned char* img1, unsigned char* img2, unsigned int width, unsigned int height) {
+    *finalImg = malloc(2 * width * height * 4);
+
 }
 
 void createTextureImage() {
+    VkPhysicalDeviceProperties properties;
+    vkGetPhysicalDeviceProperties(pDevice, &properties);
+    printf("Max Texture Dimensions: %d\n",properties.limits.maxImageDimension2D);
+
     unsigned char* img = 0;
     unsigned char* img2 = 0;
     unsigned int width, height, width2, height2;
     unsigned error = lodepng_decode32_file(&img, &width, &height, "Tic.png");
     unsigned error2 = lodepng_decode32_file(&img2, &width2, &height2, "Rochelle.png");
     unsigned char* img3 = 0;
-    combineImgs(&img3,  img, img2, width, height);
+    combineImgsWid(&img3,  img, img2, width, height);
+
     width *= 2;
+    unsigned char* img4 = 0;
+
+    combineImgsWid(&img3,  img3, img3, width, height);
+    width *= 2;
+    /*for(int i = 0; i < 3; i++) {
+        combineImgsWid(&img3,  img3, img3, width, height);
+        width *= 2;
+    }*/
+    printf("Image Width: %d\n", width);
+
     VkDeviceSize imageSize = width * height * 4;
 
     if (error) {
@@ -1265,7 +1265,7 @@ void createTextureImage() {
     free(img);
     free(img2);
     free(img3);
-    printf("Image Freed\n");
+    free(img4);
     createImage(width, height, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &textureImage, &textureImageMemory);
 
     transitionImageLayout(textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
@@ -1325,6 +1325,7 @@ void createTextureSampler() {
     samplerInfo.anisotropyEnable = VK_TRUE;
     VkPhysicalDeviceProperties properties;
     vkGetPhysicalDeviceProperties(pDevice, &properties);
+
     samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
 
     samplerInfo.compareEnable = VK_FALSE;
@@ -1936,8 +1937,6 @@ void runDisplay() {
         copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
 #endif
         //createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &stagingBuffer, &stagingBufferMemory);
-
-
 
         //vkDestroyBuffer(lDevice, stagingBuffer, 0);
         //vkFreeMemory(lDevice, stagingBufferMemory, 0);

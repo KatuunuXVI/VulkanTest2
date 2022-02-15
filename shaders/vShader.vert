@@ -7,7 +7,7 @@ layout(binding=0, std430) uniform UniformBufferObject {
 
 } ubo;
 
-layout(location = 0) in uvec3 inPosition;
+layout(location = 0) in ivec3 inPosition;
 layout(location = 1) in uvec4 inColor;
 layout(location = 2) in vec2 inTexCoord;
 layout(location = 3) in uint inIndex;
@@ -27,8 +27,8 @@ void main() {
     //gl_Position = ubo.model * vec4(inPosition, 1.0);
     gl_Position =  ubo.model * vec4(inPosition.x/512.0 - 1,inPosition.y/512.0-1 ,inPosition.z, 1.0);
     //fragColor = vec4(float(inColor.x)/255.0,float(inColor.y)/255.0,float(inColor.z/255),float(inColor.w)/255);
-    fragColor = vec4(float(inColor.x)/255.0,float(inColor.y)/255.0,float(inColor.z/255),(ubo.texW[0]/2)/255.0);
+    fragColor = vec4(float(inColor.x)/255.0,float(inColor.y)/255.0,float(inColor.z/255),inColor.w/255.0);
     //fragColor = vec4(1,1,1,1);
     fragTexCoord = vec2(inTexCoord.x/ubo.texW[1], inTexCoord.y/ubo.texH[0]) ;
-    fragIndex = texIndex;
+
 }

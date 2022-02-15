@@ -36,9 +36,9 @@ typedef struct SwapChainSupportDetails_T {
  ******************/
 
 typedef struct positionVertex {
-    __attribute__((unused)) unsigned short x;
-    __attribute__((unused)) unsigned short y;
-    __attribute__((unused)) unsigned short z;
+    __attribute__((unused))  short x;
+    __attribute__((unused))  short y;
+    __attribute__((unused))  short z;
 } positionVertex;
 
 typedef struct colorVertex {
@@ -181,14 +181,21 @@ static VkImageView textureImageView[2];
 static uint texCount = 2;
 
 static VkSampler textureSampler;
-
-vertexArrayObject vertices[4] = {
-        {{0, 0, 0}, {255, 255, 255, 255}, {0, 0}, 0},
+vertexArrayObject vertices[8] = {
+        {{512, 0, 0}, {255, 255, 255, 255}, {1024, 0}, 0},
         {{1024, 0, 0}, {255, 255, 255, 255}, {2048, 0}, 0},
         {{1024, 1024, 0}, {255, 255, 255, 255}, {2048,1024}, 0},
-        {{0, 1024, 0}, {255, 255, 255, 255}, {0,1024}, 0}
+        {{512, 1024, 0}, {255, 255, 255, 255}, {1024,1024}, 0},
+        {{0, 0, 0}, {255, 255, 255, 255}, {0, 0}, 1},
+        {{512, 0, 0}, {255, 255, 255, 255}, {1024, 0}, 1},
+        {{512, 1024, 0}, {255, 255, 255, 255}, {1024,1024}, 1},
+        {{0, 1024, 0}, {255, 255, 255, 255}, {0,1024}, 1}
 };
-unsigned short indices[6] = { 0, 1, 2, 2, 3, 0};
+
+typedef short indexArrayObject[6];
+
+indexArrayObject indices[2] = {{ 0, 1, 2, 2, 3, 0},
+                               {4,5,6,6,7,4}};
 
 unsigned short texW[32];
 unsigned short texH[32];
@@ -674,13 +681,13 @@ void createGraphicsPipeline() {
     vInputInfo.pVertexBindingDescriptions = &vertexBind;
 
     /**Set Vertex Attributes*/
-    vInputInfo.vertexAttributeDescriptionCount = 3;
+    vInputInfo.vertexAttributeDescriptionCount = 4;
     VkVertexInputAttributeDescription attDesc[4];
 
     /**Define Position Data*/
     attDesc[0].binding = 0;
     attDesc[0].location = 0;
-    attDesc[0].format = VK_FORMAT_R16G16B16_UINT;
+    attDesc[0].format = VK_FORMAT_R16G16B16_SINT;
     attDesc[0].offset = 0;
 
     /**Define Color Data*/
@@ -1291,7 +1298,7 @@ void createTextureImage(int tIndex, const char* file) {
     unsigned char* img = 0;
     unsigned char* img2 = 0;
     unsigned int width, height, width2, height2;
-    unsigned error = lodepng_decode32_file(&img, &width, &height, "Tic.png");
+    unsigned error = lodepng_decode32_file(&img, &width, &height, "Tic2.png");
     unsigned error2 = lodepng_decode32_file(&img2, &width2, &height2, file);
     unsigned char* img3 = 0;
     combineImgsWid(&img3,  img, img2, width, height);
@@ -1366,7 +1373,6 @@ void createTextureImage(int tIndex, const char* file) {
     vkDestroyBuffer(lDevice, tStagingBuffer, 0);
     vkFreeMemory(lDevice, tStagingBufferMemory, 0);
 }
-
 VkImageView createImageView(VkImage image, VkFormat format) {
     VkImageViewCreateInfo viewInfo;
     viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -1393,6 +1399,52 @@ VkImageView createImageView(VkImage image, VkFormat format) {
     }
     return imageView;
 }
+void swapTextureImage(int tIndex, const char* file) {
+    VkPhysicalDeviceProperties properties;
+    vkGetPhysicalDeviceProperties(pDevice, &properties);
+
+    unsigned char* img = 0;
+    unsigned char* img2 = 0;
+    unsigned int width, height, width2, height2;
+    unsigned error = lodepng_decode32_file(&img, &width, &height, "Tic.png");
+    unsigned error2 = lodepng_decode32_file(&img2, &width2, &height2, file);
+    unsigned char* img3 = 0;
+    combineImgsWid(&img3,  img, img2, width, height);
+
+    width *= 2;
+    VkDeviceSize imageSize = width * height * 4;
+
+    if (error) {
+        fprintf(stderr,"error %u: %s\n", error, lodepng_error_text(error)); exit(1);
+    }
+
+    VkBuffer tStagingBuffer;
+    VkDeviceMemory tStagingBufferMemory;
+    createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &tStagingBuffer, &tStagingBufferMemory);
+
+    void* data;
+    vkMapMemory(lDevice, tStagingBufferMemory, 0, imageSize, 0, &data);
+    memcpy(data, img3, imageSize);
+    vkUnmapMemory(lDevice, tStagingBufferMemory);
+
+    free(img);
+    free(img2);
+    free(img3);
+
+    texW[tIndex] = width;
+    texH[tIndex] = height;
+
+    transitionImageLayout(textureImage[tIndex], VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    copyBufferToImage(tStagingBuffer, textureImage[tIndex], width, height);
+    transitionImageLayout(textureImage[tIndex], VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+    vkDestroyBuffer(lDevice, tStagingBuffer, 0);
+    vkFreeMemory(lDevice, tStagingBufferMemory, 0);
+
+    //textureImageView[tIndex] = createImageView(textureImage[tIndex], VK_FORMAT_R8G8B8A8_UNORM);
+}
+
+
 
 void createTextureImageView() {
     for(uint i = 0; i < texCount; i++) textureImageView[i] = createImageView(textureImage[i], VK_FORMAT_R8G8B8A8_UNORM);
@@ -1943,15 +1995,16 @@ void runDisplay() {
     while(!glfwWindowShouldClose(window)) {
         struct timeval start, end;
         gettimeofday(&start, NULL);
-        float tranX = 0.001f;
-        /*vData[0].texture.x += tranX;
+        float tranX = 1;
+        vData[0].position.x -= tranX;
+        vData[1].position.x -= tranX;
+        vData[2].position.x -= tranX;
+        vData[3].position.x -= tranX;
 
-        vData[1].texture.x += tranX;
-
-        vData[2].texture.x += tranX;
-
-        vData[3].texture.x += tranX;
-        */
+        vData[4].position.x += tranX;
+        vData[5].position.x += tranX;
+        vData[6].position.x += tranX;
+        vData[7].position.x += tranX;
         VkDeviceSize bufferSize = sizeof(vertices);
 #ifndef NOSTAGE
         copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
@@ -2059,9 +2112,9 @@ void openDisplay() {
     createFrameBuffers();
     createCommandPool();
     createUniformBuffers();
-    createTextureImage(1, "CC.png");
     createTextureImage(0, "Rochelle.png");
-
+    createTextureImage(1, "CC.png");
+    //swapTextureImage(1, "Rochelle.png");
     createTextureImageView();
     createTextureSampler();
     createVertexBuffer();

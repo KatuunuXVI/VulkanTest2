@@ -183,13 +183,13 @@ static uint texCount = 2;
 static VkSampler textureSampler;
 vertexArrayObject vertices[8] = {
         {{512, 0, 0}, {255, 255, 255, 255}, {1024, 0}, 0},
-        {{1024, 0, 0}, {255, 255, 255, 255}, {2048, 0}, 0},
-        {{1024, 1024, 0}, {255, 255, 255, 255}, {2048,1024}, 0},
-        {{512, 1024, 0}, {255, 255, 255, 255}, {1024,1024}, 0},
+        {{1024, 0, 0}, {255, 255, 255, 255}, {2047, 0}, 0},
+        {{1024, 1024, 0}, {255, 255, 255, 255}, {2047,1023}, 0},
+        {{512, 1024, 0}, {255, 255, 255, 255}, {1024,1023}, 0},
         {{0, 0, 0}, {255, 255, 255, 255}, {0, 0}, 1},
-        {{512, 0, 0}, {255, 255, 255, 255}, {1024, 0}, 1},
-        {{512, 1024, 0}, {255, 255, 255, 255}, {1024,1024}, 1},
-        {{0, 1024, 0}, {255, 255, 255, 255}, {0,1024}, 1}
+        {{512, 0, 0}, {255, 255, 255, 255}, {1023, 0}, 1},
+        {{512, 1024, 0}, {255, 255, 255, 255}, {1023,1023}, 1},
+        {{0, 1024, 0}, {255, 255, 255, 255}, {0,1023}, 1}
 };
 
 typedef short indexArrayObject[6];
@@ -1992,6 +1992,8 @@ void runDisplay() {
 
     double avgOpTime = 0;
     int opCount = 0;
+    int countDown = 20;
+    bool swap = FALSE;
     while(!glfwWindowShouldClose(window)) {
         struct timeval start, end;
         gettimeofday(&start, NULL);
@@ -2005,6 +2007,25 @@ void runDisplay() {
         vData[5].position.x += tranX;
         vData[6].position.x += tranX;
         vData[7].position.x += tranX;
+        if(countDown == 0) {
+            countDown = 20;
+            if(!swap) {
+
+                vData[0].texture.x = vData[3].texture.x = 0;
+                vData[1].texture.x = vData[2].texture.x = 1023;
+                vData[4].texture.x = vData[7].texture.x = 1023;
+                vData[5].texture.x = vData[6].texture.x = 2047;
+            } else {
+                vData[0].texture.x = vData[3].texture.x = 1024;
+                vData[1].texture.x = vData[2].texture.x = 2047;
+                vData[4].texture.x = vData[7].texture.x = 0;
+                vData[5].texture.x = vData[6].texture.x = 1023;
+            }
+
+            swap = !swap;
+
+        }
+        countDown--;
         VkDeviceSize bufferSize = sizeof(vertices);
 #ifndef NOSTAGE
         copyBuffer(stagingBuffer, vertexBuffer, bufferSize);

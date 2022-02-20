@@ -7,7 +7,8 @@
 #include <lodepng.h>
 #define _USE_MATH_DEFINES
 #include <math.h>
-
+#include <pthread.h>
+//#include <windows.h>
 /**********************
  * Struct Definitions *
  **********************/
@@ -16,7 +17,7 @@
  * Device Structs *
  ******************/
 #define NOSTAGE
-#undef NOSTAGE
+//#undef NOSTAGE
 typedef struct QueueFamilies_T {
     unsigned char familiesFound;
     unsigned int graphicsFamily;
@@ -36,9 +37,9 @@ typedef struct SwapChainSupportDetails_T {
  ******************/
 
 typedef struct positionVertex {
-    __attribute__((unused))  short x;
-    __attribute__((unused))  short y;
-    __attribute__((unused))  short z;
+    __attribute__((unused)) short x;
+    __attribute__((unused)) short y;
+    __attribute__((unused)) short z;
 } positionVertex;
 
 typedef struct colorVertex {
@@ -64,6 +65,11 @@ typedef struct vertexArrayObject {
     __attribute__((unused))textureVertex texture; /**Specify Vertex Texture on Screen*/
     textureIndex index;
 } vertexArrayObject;
+
+typedef struct vVector {
+     long size;
+     long alloc;
+};
 
 typedef struct uniformBufferObject {
     float model[4][4];
@@ -149,8 +155,6 @@ vertexArrayObject* vData;
 unsigned short* iData;
 
 /**Uniform Transformation Data definition*/
-
-uniformBufferObject uPrototype;
 uniformBufferObject* uData;
 
 /**Storage for Vertex Data*/
@@ -166,7 +170,7 @@ static VkBuffer indexBuffer;
 static VkDeviceMemory indexBufferMemory;
 
 /**Number of Textures*/
-
+static uint texCount = 0;
 
 /**Storage For Texture Data*/
 static VkImage textureImage[2];
@@ -178,24 +182,29 @@ static VkImageView textureImageView[2];
 
 
 
-static uint texCount = 2;
+
+
 
 static VkSampler textureSampler;
+
+
+
 vertexArrayObject vertices[8] = {
-        {{512, 0, 0}, {255, 255, 255, 255}, {1024, 0}, 0},
-        {{1024, 0, 0}, {255, 255, 255, 255}, {2047, 0}, 0},
-        {{1024, 1024, 0}, {255, 255, 255, 255}, {2047,1023}, 0},
-        {{512, 1024, 0}, {255, 255, 255, 255}, {1024,1023}, 0},
-        {{0, 0, 0}, {255, 255, 255, 255}, {0, 0}, 1},
-        {{512, 0, 0}, {255, 255, 255, 255}, {1023, 0}, 1},
-        {{512, 1024, 0}, {255, 255, 255, 255}, {1023,1023}, 1},
-        {{0, 1024, 0}, {255, 255, 255, 255}, {0,1023}, 1}
+        {{768, 1024, 0}, {255, 255, 255, 255}, {1024, 0}, -1},
+        {{1024, 1024, 0}, {255, 255, 255, 255}, {2047, 0}, -1},
+        {{1024, 512, 0}, {255, 255, 255, 255}, {2047,1023}, -1},
+        {{768, 512, 0}, {255, 255, 255, 255}, {1024,1023}, -1},
+        {{0, 1024, 0}, {255, 255, 255, 255}, {0, 0}, 1},
+        {{512, 1024, 0}, {255, 255, 255, 255}, {1023, 0}, 1},
+        {{512, 0, 0}, {255, 255, 255, 255}, {1023,1023}, 1},
+        {{0, 0, 0}, {255, 255, 255, 255}, {0,1023}, 1}
 };
 
 typedef short indexArrayObject[6];
 
 indexArrayObject indices[2] = {{ 0, 1, 2, 2, 3, 0},
                                {4,5,6,6,7,4}};
+
 
 unsigned short texW[32];
 unsigned short texH[32];
@@ -704,7 +713,7 @@ void createGraphicsPipeline() {
 
     attDesc[3].binding = 0;
     attDesc[3].location = 3;
-    attDesc[3].format = VK_FORMAT_R16_UINT;
+    attDesc[3].format = VK_FORMAT_R16_SINT;
     attDesc[3].offset = offsetof(vertexArrayObject, index);
     vInputInfo.pVertexAttributeDescriptions = attDesc;
 
@@ -995,20 +1004,22 @@ void createUniformBuffers() {
 }
 
 void createDescriptorPool() {
-    VkDescriptorPoolSize poolSizes[3];
+    VkDescriptorPoolSize poolSizes[1 + texCount];
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     poolSizes[0].descriptorCount = swapChainSize;
 
-    poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    poolSizes[1].descriptorCount = swapChainSize;
+    for(uint i = 0; i < texCount; i++) {
+        poolSizes[i+1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        poolSizes[i+1].descriptorCount = swapChainSize;
+    }
 
-    poolSizes[2].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    poolSizes[2].descriptorCount = swapChainSize;
+
+
     VkDescriptorPoolCreateInfo poolInfo;
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     poolInfo.pNext = 0;
     poolInfo.flags = 0;
-    poolInfo.poolSizeCount = 3;
+    poolInfo.poolSizeCount = 1+texCount;
     poolInfo.pPoolSizes = poolSizes;
     poolInfo.maxSets = swapChainSize;
 
@@ -1072,7 +1083,7 @@ void createDescriptorSets() {
         descriptorWrites[1].dstBinding = 1;
         descriptorWrites[1].dstSet = descriptorSets[i];
         descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        descriptorWrites[1].descriptorCount = 2;
+        descriptorWrites[1].descriptorCount = texCount;
         descriptorWrites[1].pImageInfo = imageInfo;
         descriptorWrites[1].pBufferInfo = 0;
         descriptorWrites[1].pTexelBufferView = 0;
@@ -1114,6 +1125,8 @@ void updateUniformBuffer(uint currentImage) {
     uData->texH[0] = 1024;
 
     uData->texW[0] = 2048;
+
+    uData->texH[1] = 1024;
     uData->texW[1] = 2048;
     //for(int i = 0; i < 32; i++) uData->texW[i] = 2048;
     uniformBufferObject* uDRef = uData;
@@ -1298,7 +1311,7 @@ void createTextureImage(int tIndex, const char* file) {
     unsigned char* img = 0;
     unsigned char* img2 = 0;
     unsigned int width, height, width2, height2;
-    unsigned error = lodepng_decode32_file(&img, &width, &height, "Tic2.png");
+    unsigned error = lodepng_decode32_file(&img, &width, &height, "Jayce.png");
     unsigned error2 = lodepng_decode32_file(&img2, &width2, &height2, file);
     unsigned char* img3 = 0;
     combineImgsWid(&img3,  img, img2, width, height);
@@ -1365,13 +1378,13 @@ void createTextureImage(int tIndex, const char* file) {
 
     vkBindImageMemory(lDevice, textureImage[tIndex], textureImageMemory[tIndex], 0);
 
-
     transitionImageLayout(textureImage[tIndex], VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
     copyBufferToImage(tStagingBuffer, textureImage[tIndex], width, height);
     transitionImageLayout(textureImage[tIndex], VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
     vkDestroyBuffer(lDevice, tStagingBuffer, 0);
     vkFreeMemory(lDevice, tStagingBufferMemory, 0);
+    texCount++;
 }
 VkImageView createImageView(VkImage image, VkFormat format) {
     VkImageViewCreateInfo viewInfo;
@@ -1905,6 +1918,22 @@ void createDescriptorSetLayout() {
 
 }
 
+typedef struct keyBind {
+    const short jumpKey;
+    const short strikeKey;
+    //const short
+} keyBind;
+keyBind initKeyBind() {
+    return (keyBind) { GLFW_KEY_A };
+}
+keyBind keyConf;
+static void KeyHandler(GLFWwindow* w, int key, int scancode, int action, int mods) {
+    printf("Key: %d\n", key);
+    printf("A: %d\n", GLFW_KEY_A);
+
+
+
+}
 
 
 void initWindow(int width, int height) {
@@ -1916,12 +1945,14 @@ void initWindow(int width, int height) {
     glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE); /**GLFW Window is not resizable*/
     window = glfwCreateWindow(width, height, "Vulkan Test", 0, 0); /**Initialize Window*/
     glfwSetFramebufferSizeCallback(window, resizeCallback);
-
+    glfwSetKeyCallback(window, KeyHandler);
 }
 
 static void resizeCallback() {
     resized = TRUE;
 }
+
+
 /*********************
  * General Functions *
  *********************/
@@ -1979,6 +2010,17 @@ void closeDisplay() {
 
 }
 bool ui = FALSE;
+
+double timeDfMs(struct timeval start, struct timeval end) {
+    return ((end.tv_sec - start.tv_sec) * 1000000 + end.tv_usec - start.tv_usec)/1000.0;
+}
+
+void logOpTime(const char* msg, struct timeval start, struct timeval end) {
+    printf("%s: %f ms\n",msg, timeDfMs(start, end));
+}
+struct timeval opS, opEnd;
+#define TIMEOP(func, s) gettimeofday(&opS, NULL); func; gettimeofday(&opEnd, NULL); gettimeofday(&opEnd, NULL); logOpTime(s,opS, opEnd)
+
 void runDisplay() {
     imgMaps = malloc(sizeof(int) * swapChainSize);
     memset(imgMaps,0,sizeof(int) * swapChainSize);
@@ -1997,50 +2039,24 @@ void runDisplay() {
     while(!glfwWindowShouldClose(window)) {
         struct timeval start, end;
         gettimeofday(&start, NULL);
-        float tranX = 1;
-        vData[0].position.x -= tranX;
-        vData[1].position.x -= tranX;
-        vData[2].position.x -= tranX;
-        vData[3].position.x -= tranX;
 
-        vData[4].position.x += tranX;
-        vData[5].position.x += tranX;
-        vData[6].position.x += tranX;
-        vData[7].position.x += tranX;
-        if(countDown == 0) {
-            countDown = 20;
-            if(!swap) {
 
-                vData[0].texture.x = vData[3].texture.x = 0;
-                vData[1].texture.x = vData[2].texture.x = 1023;
-                vData[4].texture.x = vData[7].texture.x = 1023;
-                vData[5].texture.x = vData[6].texture.x = 2047;
-            } else {
-                vData[0].texture.x = vData[3].texture.x = 1024;
-                vData[1].texture.x = vData[2].texture.x = 2047;
-                vData[4].texture.x = vData[7].texture.x = 0;
-                vData[5].texture.x = vData[6].texture.x = 1023;
-            }
-
-            swap = !swap;
-
-        }
-        countDown--;
-        VkDeviceSize bufferSize = sizeof(vertices);
+        /**Update Vertex Data here*/
 #ifndef NOSTAGE
-        copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
+        /**If Stagine Buffers are used Copy Vertex Data to the Vertex Buffer*/
+        TIMEOP(copyBuffer(stagingBuffer, vertexBuffer, sizeof vertices), "Copy Buffer");
 #endif
 
 
+        TIMEOP(glfwPollEvents(),"GLFW Poll"); /**Check for input*/
 
-        glfwPollEvents(); /**Check for input*/
-
-        vkWaitForFences(lDevice, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
+        /**Wait for current Frame to become available*/
+        TIMEOP(vkWaitForFences(lDevice, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX), "Wait For Fences");
 
         uint imageIndex;
 
         /**Get Image from the Swap Chain*/
-        VkResult imgRes = vkAcquireNextImageKHR(lDevice, swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
+        TIMEOP(VkResult imgRes = vkAcquireNextImageKHR(lDevice, swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex),"Acquire Image");
 
         /**Check that Swap Chain is still Optimal*/
         if(imgRes == VK_ERROR_OUT_OF_DATE_KHR) {
@@ -2051,11 +2067,12 @@ void runDisplay() {
             return;
         }
 
-        if(imagesInFlight[imageIndex]) vkWaitForFences(lDevice, 1, &imagesInFlight[imageIndex], VK_TRUE, UINT64_MAX);
+        TIMEOP(if(imagesInFlight[imageIndex]) vkWaitForFences(lDevice, 1, &imagesInFlight[imageIndex], VK_TRUE, UINT64_MAX),"Wait For Fences 2");
         imagesInFlight[imageIndex] = inFlightFences[currentFrame];
 
-        updateUniformBuffer(imageIndex);
-        VkSubmitInfo submitInfo;
+        TIMEOP(updateUniformBuffer(imageIndex),"Update Uniform Buffer");
+
+        TIMEOP(VkSubmitInfo submitInfo;
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
         submitInfo.pNext = 0;
 
@@ -2069,17 +2086,18 @@ void runDisplay() {
 
         VkSemaphore signalSemaphores[] = {renderFinishedSemaphores[currentFrame]};
         submitInfo.signalSemaphoreCount = 1;
-        submitInfo.pSignalSemaphores = signalSemaphores;
+        submitInfo.pSignalSemaphores = signalSemaphores;,"Initialize Submit Info");
 
-        vkResetFences(lDevice, 1, &inFlightFences[currentFrame]);
+        TIMEOP(vkResetFences(lDevice, 1, &inFlightFences[currentFrame]),"Submit Fences");
 
+        TIMEOP(
         if(vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFences[currentFrame])) {
             fprintf(stderr,"Failed to submit Draw Command Buffer\n");
             exit(1);
-        }
+        },"Queue Submit");
 
 
-        VkPresentInfoKHR  presentInfo;
+        TIMEOP(VkPresentInfoKHR  presentInfo;
         presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
         presentInfo.pNext = 0;
         presentInfo.waitSemaphoreCount = 1;
@@ -2089,8 +2107,9 @@ void runDisplay() {
         presentInfo.swapchainCount = 1;
         presentInfo.pSwapchains = swapChains;
         presentInfo.pImageIndices = &imageIndex;
-        presentInfo.pResults = 0;
-        VkResult presRes = vkQueuePresentKHR(presentQueue, &presentInfo);
+        presentInfo.pResults = 0;,"Init Present Info");
+
+        TIMEOP(VkResult presRes = vkQueuePresentKHR(presentQueue, &presentInfo),"Present Queue");
 
         if(presRes == VK_ERROR_OUT_OF_DATE_KHR || presRes == VK_SUBOPTIMAL_KHR || resized) {
             reCreateSwapChain();
@@ -2102,16 +2121,26 @@ void runDisplay() {
         }
 
 
-
+        /**Increment Frame*/
         currentFrame = (currentFrame + 1)% MAX_FRAMES_IN_FLIGHT;
+        /**Record Time that operation took*/
         gettimeofday(&end, NULL);
-        //printf("took %f milliseconds\n", ((end.tv_sec - start.tv_sec) * 1000000 + end.tv_usec - start.tv_usec)/1000.0);
-        avgOpTime += ((end.tv_sec - start.tv_sec) * 1000000 + end.tv_usec - start.tv_usec)/1000.0;
+        double opTime =((end.tv_sec - start.tv_sec) * 1000000 + end.tv_usec - start.tv_usec)/1000.0;
+        if(glfwWindowShouldClose(window)) {
+            printf("Exiting\n");
+            continue;
+        }
+        avgOpTime += opTime;
         opCount++;
         usleep(300);
+        //Sleep(300);
+        printf("Op Time: %f\n",opTime);
+        printf("FPS: %f\n", 1000.0f/opTime);
+        printf("--------------------------\n--------------------------\n");
     }
     vkDeviceWaitIdle(lDevice);
-    printf("Average Op Time: %f\n", avgOpTime/opCount);
+    //printf("Average Op Time: %f\n", avgOpTime/opCount);
+    printf("Average FPS: %f\n", opCount/(avgOpTime/1000.0f));
 
 }
 
@@ -2133,9 +2162,9 @@ void openDisplay() {
     createFrameBuffers();
     createCommandPool();
     createUniformBuffers();
-    createTextureImage(0, "Rochelle.png");
-    createTextureImage(1, "CC.png");
-    //swapTextureImage(1, "Rochelle.png");
+    createTextureImage(0, "Rochelle2.png");
+    createTextureImage(1, "Jayce.png");
+
     createTextureImageView();
     createTextureSampler();
     createVertexBuffer();

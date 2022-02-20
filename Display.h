@@ -25,6 +25,8 @@ typedef struct colorVertex colorVertex;
 
 typedef struct vertexArrayObject vertexArrayObject;
 
+typedef struct vVector;
+
 #ifndef NDEBUG
 
 /************************
